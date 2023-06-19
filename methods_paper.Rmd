@@ -1,0 +1,126 @@
+---
+title: "Methods paper - Jessie_NPK_analysis"
+author: "Jessie Wang - adapted from Megan Frederickson"
+date: "2022-09-20"
+output: html_document
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Load packages
+
+```{r load packages}
+library(tidyverse)
+library(car)
+library(lme4)
+library(lmerTest)
+```
+
+Load data
+
+```{r Load data}
+df <- read_csv("methods_data.csv")
+
+df$block <- as.factor(df$block)
+df$plate_number <- as.factor(df$plate_number)
+df$inoc <- as.factor(df$inoc)
+df$well <- as.factor(df$well)
+df$daycol <- as.numeric(df$daycol)
+```
+
+
+Remove empty wells from dataset
+
+```{r Remove empty wells}
+well_sqmm <- df %>% group_by(well) %>% summarize(sum.sqmm = sum(sqmm, na.rm=TRUE)) 
+empty_wells <- well_sqmm[which(well_sqmm$sum.sqmm == 0), "well"] #These are the well IDs that were 0 throughout the experiment
+df$omit.zeros <- !(df$well %in% empty_wells$well)
+df <- df[df$omit.zeros, ] #Subsets to only wells that are non-zero at some point during experiment
+```
+
+
+Model data
+
+```{r Linear mixed models}
+#Area
+model1 <- lmer(sqmm~inoc*poly(nitr_N,2)+poly(daycol,2)+(1|edge)+(1|plate_number), data=df)
+summary(model1)
+Anova(model1, type=3)
+
+#Greenness
+model2 <- lmer(green_per_arr~inoc*poly(nitr_N,2)+poly(daycol,2)+(1|edge)+(1|plate_number), data=df)
+summary(model2)
+Anova(model2, type=3)
+```
+
+
+Visualize the data
+
+```{r fig.height=5, fig.width=16}
+levels(df$inoc) <- c("No", "Yes")
+
+N_levels<-c(`0`="0 mg/L N",`5`="5 mg/L N",`10`="10 mg/L N",
+            `15`="15 mg/L N",`20`="20 mg/L N",`25`="25 mg/L N",
+            `30`="30 mg/L N",`35`="35 mg/L N",`40`="40 mg/L N",
+            `45`="45 mg/L N")
+
+fig_area <- ggplot(data=df, aes(daycol,sqmm))+
+  geom_smooth(aes(color=inoc), se=FALSE)+
+  geom_path(aes(group=well, color=inoc), alpha=0.1)+
+  facet_grid(~nitr_N, labeller = as_labeller(N_levels))+
+  scale_color_manual(values=c("#D55E00", "#0072B2"))+
+  xlab("Day")+ylab(bquote('Frond area ('~mm^2*')'))+labs(color="Microbes")+
+  scale_x_continuous(breaks = seq(from = 0, to = 10, by = 2))+
+  theme_classic()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.spacing = unit(10, "pt"),
+        axis.title=element_text(size = 24),axis.text=element_text(size=16),
+        plot.title=element_text(size=28),
+        legend.title=element_text(size=20),legend.text=element_text(size=16),
+        strip.text.x = element_text(size = 16))
+fig_area
+ggsave("fig_area.tif",width=16,height=5,device="tiff",dpi=600)
+
+
+fig_green <- df %>% 
+  ggplot(aes(daycol,green_per_arr))+
+  geom_smooth(aes(color=inoc), se=FALSE)+
+  geom_path(aes(group=well,color=inoc), alpha=0.1)+
+  facet_grid(~nitr_N, labeller = as_labeller(N_levels))+
+  scale_color_manual(values=c("#D55E00", "#0072B2"))+
+  xlab("Day")+ylab("Greenness of fronds")+labs(color="Microbes")+
+  scale_x_continuous(breaks = seq(from = 0, to = 10, by = 2))+
+  theme_classic()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        panel.spacing = unit(6, "pt"),
+        axis.title=element_text(size = 24),axis.text=element_text(size=18),
+        plot.title=element_text(size=28),
+        legend.title=element_text(size=20),legend.text=element_text(size=18),
+        strip.text.x = element_text(size = 18))
+fig_green
+ggsave("fig_green.tif",width=16,height=5,device="tiff",dpi=600)
+```
+
+
+All data
+```{r fig.height=5, fig.width=8}
+all_data<-df %>% 
+  filter(!is.na(sqmm)) %>% 
+  ggplot(aes(daycol,sqmm,group=well))+
+  geom_path(size=0.5,alpha=0.1)+
+  scale_x_continuous(expand=c(0,0),limits=c(0,10),breaks=seq(0,10,1))+
+  scale_y_continuous(expand=c(0,0),limits=c(0,30),breaks=seq(0,30,5))+
+  labs(x="Day",y=expression("Frond area (mm)"^2),
+       title="")+
+  theme_bw()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+        axis.title = element_text(size = 24),axis.text=element_text(size=18),
+        plot.title=element_text(size=28,hjust=0.5,face="bold"),
+        plot.margin = unit(c(t=0.5,r=1.5,b=0.5,l=0.5), "cm"))
+ggsave("all_data.tif",width=8,height=5,device="tiff",dpi=600)
+```
+
