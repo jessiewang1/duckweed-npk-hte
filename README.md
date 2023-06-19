@@ -6,7 +6,9 @@ Kose T, Lins TF, Wang J, O'Brien AM, Sinton D, Frederickson ME. "Accelerated hig
 # Contents
 
 **methods_paper.Rmd**
+
 RMarkdown file detailing code to analyze data and generate Figures 4, 5, and S8.
 
 **methods_data.csv**
+
 Dataset including information on experimental units and phenotypic data collected from image analysis.
